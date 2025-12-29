@@ -86,7 +86,7 @@ export default function RandomnessReport() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <p>No block frequency data available.</p>
+            <p>No block frequency data available because of all test cases are not passed.</p>
           )}
 
           {/* Results Summary */}
