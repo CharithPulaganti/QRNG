@@ -1,6 +1,14 @@
 import React, { useState } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts'
-import { getBits, extractBits, getReport, getKey } from '../services/api'
+import {
+  getBits,
+  extractBits,
+  getReport,
+  getKey,
+  downloadRawBits,
+  downloadFinalTxt,
+  downloadFinalBin
+} from '../services/api'
 import PValueTable from './PValueTable'
 
 export default function Dashboard() {
@@ -18,7 +26,6 @@ export default function Dashboard() {
     const ones = (s.match(/1/g) || []).length
     const zeros = n - ones
     const freq = ones / n
-    // rolling bias data downsampled
     const step = Math.max(1, Math.floor(n / 2000))
     const data = []
     let c1 = 0
@@ -60,24 +67,63 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input type="number" value={count} onChange={e => setCount(+e.target.value)} min={1000} max={5000000} />
+
+      {/* Controls */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          type="number"
+          value={count}
+          onChange={e => setCount(+e.target.value)}
+          min={1000}
+          max={5000000}
+        />
+
         <button onClick={handleGenerate}>Generate Bits</button>
+
         <select value={method} onChange={e => setMethod(e.target.value)}>
           <option value="sha256">SHA-256 Extractor</option>
-          <option value="von_neumann">Von Neumann</option>
+          <option value="vn">Von Neumann</option>
         </select>
-        <button onClick={handleExtract} disabled={!bits}>Apply Extractor</button>
-        <button onClick={handleKey}>Generate 256-bit Key</button>
+
+        <button onClick={handleExtract} disabled={!bits}>
+          Apply Extractor
+        </button>
+
+        <button onClick={handleKey}>
+          Generate 256-bit Key
+        </button>
       </div>
 
-      {note && <div style={{ background: '#fff3cd', padding: 8, border: '1px solid #ffeeba' }}>
-        <b>Note:</b> {note}
-      </div>}
+      {/* Download Buttons */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={() => downloadRawBits(count)}>
+          Download RAW Bits (TXT)
+        </button>
 
+        <button onClick={() => downloadFinalTxt(count, method)}>
+          Download Extracted Bits (TXT)
+        </button>
+
+        <button onClick={() => downloadFinalBin(count, method)}>
+          Download Extracted Bits (BIN)
+        </button>
+      </div>
+
+      {/* Notes */}
+      {note && (
+        <div style={{ background: '#fff3cd', padding: 8, border: '1px solid #ffeeba' }}>
+          <b>Note:</b> {note}
+        </div>
+      )}
+
+      {/* Stats Chart */}
       {stats.n && (
         <div>
-          <p><b>Raw bits:</b> n={stats.n}, ones={stats.ones}, zeros={stats.zeros}, freq(1)={(stats.freq*100).toFixed(2)}%</p>
+          <p>
+            <b>Raw bits:</b> n={stats.n}, ones={stats.ones}, zeros={stats.zeros},
+            freq(1)={(stats.freq * 100).toFixed(2)}%
+          </p>
+
           <LineChart width={900} height={280} data={stats.trend}>
             <Line type="monotone" dataKey="freq" dot={false} />
             <CartesianGrid strokeDasharray="3 3" />
@@ -88,13 +134,18 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Post-processed info */}
       {postBits && (
         <div>
-          <p><b>Post-processed bits length:</b> {postBits.length} (method: {method})</p>
+          <p>
+            <b>Post-processed bits length:</b> {postBits.length} (method: {method})
+          </p>
         </div>
       )}
 
+      {/* Randomness Report */}
       {report && <PValueTable report={report} />}
+
     </div>
   )
 }
