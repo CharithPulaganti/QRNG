@@ -14,48 +14,66 @@ import PValueTable from './PValueTable'
 export default function Dashboard() {
   const [count, setCount] = useState(100000)
   const [bits, setBits] = useState('')
-  const [note, setNote] = useState('')
-  const [quantum, setQuantum] = useState(false)
+  const [postBits, setPostBits] = useState('')
+  const [method, setMethod] = useState('sha256')
   const [stats, setStats] = useState({})
   const [report, setReport] = useState(null)
-  const [method, setMethod] = useState('sha256')
-  const [postBits, setPostBits] = useState('')
+  const [note, setNote] = useState('')
+  const [quantum, setQuantum] = useState(false)
 
+  // -----------------------------
+  // Derived state (IMPORTANT)
+  // -----------------------------
+  const rawReady = bits.length > 0
+  const extractedReady = postBits.length > 0
+
+  // -----------------------------
+  // Stats helper
+  // -----------------------------
   const calcStats = (s) => {
     const n = s.length
     const ones = (s.match(/1/g) || []).length
     const zeros = n - ones
     const freq = ones / n
+
     const step = Math.max(1, Math.floor(n / 2000))
     const data = []
     let c1 = 0
+
     for (let i = 0; i < n; i++) {
       if (s[i] === '1') c1++
       if (i % step === 0) {
         data.push({ i, freq: c1 / (i + 1) })
       }
     }
+
     return { n, ones, zeros, freq, trend: data }
   }
 
+  // -----------------------------
+  // Actions
+  // -----------------------------
   const handleGenerate = async () => {
     const res = await getBits(count)
+
     setBits(res.bits)
     setQuantum(res.quantum)
     setNote(res.note || '')
     setStats(calcStats(res.bits))
-    setReport(null)
+
+    // reset downstream state
     setPostBits('')
+    setReport(null)
   }
 
   const handleExtract = async () => {
-    if (!bits) return
+    if (!rawReady) return
     const res = await extractBits(bits, method)
     setPostBits(res.bits)
   }
 
   const handleReport = async () => {
-    if (!bits) return
+    if (!rawReady) return
     const rep = await getReport(bits, 128)
     setReport(rep)
   }
@@ -65,6 +83,9 @@ export default function Dashboard() {
     alert(`256-bit key (hex):\n${res.hex}\nchecksum: ${res.checksum}`)
   }
 
+  // -----------------------------
+  // UI
+  // -----------------------------
   return (
     <div style={{ display: 'grid', gap: 16 }}>
 
@@ -78,14 +99,16 @@ export default function Dashboard() {
           max={5000000}
         />
 
-        <button onClick={handleGenerate}>Generate Bits</button>
+        <button onClick={handleGenerate}>
+          Generate Bits
+        </button>
 
         <select value={method} onChange={e => setMethod(e.target.value)}>
           <option value="sha256">SHA-256 Extractor</option>
           <option value="vn">Von Neumann</option>
         </select>
 
-        <button onClick={handleExtract} disabled={!bits}>
+        <button onClick={handleExtract} disabled={!rawReady}>
           Apply Extractor
         </button>
 
@@ -96,15 +119,24 @@ export default function Dashboard() {
 
       {/* Download Buttons */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => downloadRawBits(count)}>
+        <button
+          onClick={() => downloadRawBits(count)}
+          disabled={!rawReady}
+        >
           Download RAW Bits (TXT)
         </button>
 
-        <button onClick={() => downloadFinalTxt(count, method)}>
+        <button
+          onClick={() => downloadFinalTxt(count, method)}
+          disabled={!extractedReady}
+        >
           Download Extracted Bits (TXT)
         </button>
 
-        <button onClick={() => downloadFinalBin(count, method)}>
+        <button
+          onClick={() => downloadFinalBin(count, method)}
+          disabled={!extractedReady}
+        >
           Download Extracted Bits (BIN)
         </button>
       </div>
@@ -116,12 +148,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Stats Chart */}
+      {/* Stats */}
       {stats.n && (
         <div>
           <p>
-            <b>Raw bits:</b> n={stats.n}, ones={stats.ones}, zeros={stats.zeros},
-            freq(1)={(stats.freq * 100).toFixed(2)}%
+            <b>Raw bits:</b> n={stats.n}, ones={stats.ones},
+            zeros={stats.zeros}, freq(1)={(stats.freq * 100).toFixed(2)}%
           </p>
 
           <LineChart width={900} height={280} data={stats.trend}>
@@ -134,18 +166,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Post-processed info */}
-      {postBits && (
+      {/* Extracted info */}
+      {extractedReady && (
         <div>
-          <p>
-            <b>Post-processed bits length:</b> {postBits.length} (method: {method})
-          </p>
+          <b>Post-processed bits length:</b> {postBits.length} (method: {method})
         </div>
       )}
 
-      {/* Randomness Report */}
       {report && <PValueTable report={report} />}
-
     </div>
   )
 }
